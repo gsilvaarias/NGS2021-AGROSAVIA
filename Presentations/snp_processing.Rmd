@@ -1,0 +1,82 @@
+---
+title: "Simple genetic data processing in R"
+author: "Gustavo A. Silva-Arias"
+date: "26/08/2020"
+output:
+  html_document:
+    fig_caption: yes
+    toc: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This document has been created to process reduced representation sequencing output in VCF format generated from ipyrad.
+
+### R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.
+
+## Data analysis
+
+Loading required packages.
+```{r, warnings=FALSE, message=FALSE}
+## Need to install the packages "pegas", "adegenet", "ape" and "kableExtra" packages in R if not already installed.
+## To install all packages run: install.packages(c("pegas", "adegenet", "ape", "kableExtra"))
+## Once installed, load packages:
+
+library(pegas)
+library(adegenet)
+library(reshape2)
+library(ggplot2)
+library(ape)
+library(kableExtra)
+```
+
+### Read in data in VCF and store in loci object (pegas)
+```{r}
+matrix_VCF <- read.vcf("sim_data_proc2.vcf")
+matrix_VCF
+```
+
+### Transform loci object to genind object (adegenet)
+```{r}
+matrix_VCF <- loci2genind(matrix_VCF)
+```
+
+### Assign populations to the genind object and check in a table
+```{r}
+pop(matrix_VCF) <- c(rep("POP0",10),
+                     rep("POP1",10),
+                     rep("POP2",10),
+                     rep("POP3",10),
+                     rep("POP4",10))
+pop_indv_table <- cbind(as.matrix(matrix_VCF@pop),row.names(matrix_VCF@tab))
+colnames(pop_indv_table) <- c('Population','Individual')
+kable_styling(kable(pop_indv_table, caption="Table1. List of individual sampled in each population"))
+```
+
+
+### Explore the genetic structure of the data using a Neighbour Joining tree and a Principal Components Analysis
+```{r, fig.width=10, fig.height=8, message=FALSE, echo=FALSE, fig.align = "center", fig.cap="Figure 1. Neighbour joining tree of genetic distances among samples individuals based on the genetic variation in the sequenced RAD loci"}
+tre <- nj(dist(as.matrix(matrix_VCF)))
+plot(tre, type="fan", show.tip=F)
+myPal <- colorRampPalette(c("red","yellow","green","blue","orange"))
+tiplabels(matrix_VCF$pop, bg=num2col(as.numeric(matrix_VCF$pop), col.pal=myPal), cex=.5)
+add.scale.bar()
+```
+```{r, fig.width=10, fig.height=8, message=FALSE, echo=FALSE, fig.align = "center", fig.cap="Figure 2. Scatterplot of the Princial Components Analysis (PCA) summarizing the genetic variation in the sequenced RAD loci"}
+matrix_VCF_pca <- scaleGen(matrix_VCF, NA.method="mean")
+pca1 <- dudi.pca(matrix_VCF_pca, nf=2, scannf = F)
+s.class(pca1$li,
+        factor(row.names(matrix_VCF_pca),levels = row.names(matrix_VCF_pca)),
+        col = num2col(as.numeric(matrix_VCF$pop), col.pal=myPal),
+        xax=1,yax=2, sub="PC1 x PC2", axesell=FALSE, cell=0, cstar=0, cpoint=1, grid=FALSE, clabel = 0.7)
+
+# Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```
